@@ -62,6 +62,26 @@ export default class Reporter {
     "src/contexts/AuthContextProvider.jsx",
   ];
 
+  // Vitest 4 reporter API: onFinished kaldırıldı, yerine onTestRunEnd geldi.
+  // Mevcut onFinished mantığını korumak için Vitest 4 verisini Vitest 3 şekline
+  // (files[].tasks[] = { name, type:"test", result:{ state:"pass"|"fail" } }) köprüleyip
+  // onFinished'i çağırıyoruz. Böylece "npm audit fix --force" ile vitest 4'e
+  // yükseltilse bile tik gelmeye devam eder.
+  async onTestRunEnd(testModules) {
+    const tasks = [];
+    for (const mod of testModules) {
+      for (const test of mod.children.allTests()) {
+        const s = test.result().state; // "passed" | "failed" | "skipped" | "pending"
+        tasks.push({
+          name: test.name,
+          type: "test",
+          result: { state: s === "passed" ? "pass" : s === "failed" ? "fail" : s },
+        });
+      }
+    }
+    await this.onFinished([{ tasks }]);
+  }
+
   async onFinished(files) {
     let passed = 0;
     let failed = 0;
